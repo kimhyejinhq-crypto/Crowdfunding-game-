@@ -2,30 +2,37 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Startup Game - Điều khiển dự án</title>
     <style>
-        * { box-sizing: border-box; font-family: system-ui; }
-        body { background: #0b1120; color: #eef2ff; padding: 20px; }
+        * { box-sizing: border-box; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+        body { background: #0b1120; color: #eef2ff; padding: 20px; margin: 0; }
         .container { max-width: 1000px; margin: auto; }
-        .panel { background: #1e293b; border-radius: 24px; padding: 20px; margin-bottom: 20px; }
-        button { background: #ec4899; border: none; padding: 8px 16px; border-radius: 30px; font-weight: bold; cursor: pointer; margin: 5px; }
-        .card-list { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0; max-height: 300px; overflow-y: auto; padding: 5px; }
-        .card { border-radius: 20px; padding: 8px 12px; cursor: pointer; transition: 0.1s; background: #334155; }
+        .panel { background: #1e293b; border-radius: 24px; padding: 20px; margin-bottom: 20px; box-shadow: 0 8px 20px rgba(0,0,0,0.3); }
+        button { background: #ec4899; border: none; padding: 8px 16px; border-radius: 30px; font-weight: bold; cursor: pointer; margin: 5px; transition: 0.2s; color: white; }
+        button:hover { background: #be185d; transform: scale(1.02); }
+        .card-list { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0; max-height: 320px; overflow-y: auto; padding: 5px; }
+        .card { border-radius: 20px; padding: 8px 12px; cursor: pointer; transition: 0.1s; background: #334155; width: 180px; flex-shrink: 0; }
         .card.red { background: #7f1a1a; border-left: 4px solid #ef4444; }
         .card.green { background: #14532d; border-left: 4px solid #22c55e; }
         .card.purple { background: #4c1d95; border-left: 4px solid #a855f7; }
         .card.selected { background: #ec4899; color: #0f172a; border-left-color: white; }
         .card .desc { font-size: 0.65rem; color: #cbd5e1; margin-top: 4px; }
         .info-bar { background: #0f172a; border-radius: 20px; padding: 10px; display: flex; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
-        .metrics { background: #0f172a; border-radius: 16px; padding: 12px; margin-top: 15px; font-size: 0.8rem; }
+        .metrics { background: #0f172a; border-radius: 16px; padding: 12px; margin-top: 15px; font-size: 0.8rem; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px,1fr)); gap: 8px; }
         .investors { background: #0f172a; border-radius: 16px; padding: 12px; margin-top: 15px; max-height: 200px; overflow-y: auto; }
         .flex { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .scenario-banner { background: #ec4899; color: #0f172a; border-radius: 16px; padding: 12px; margin-bottom: 20px; font-weight: bold; text-align: center; font-size: 1rem; }
         .reaction-trigger { background: #8b5cf6; border-radius: 12px; padding: 10px; margin: 10px 0; }
         .endgame { background: #ec4899; border-radius: 16px; padding: 16px; text-align: center; }
-        .trigger-card { background: #4c1d95; border-radius: 12px; padding: 8px; margin: 5px; display: inline-block; cursor: pointer; }
-        .trigger-card:hover { background: #6d28d9; }
+        .trigger-card { background: #4c1d95; border-radius: 12px; padding: 8px; margin: 5px; display: inline-block; cursor: pointer; transition: 0.1s; }
+        .trigger-card:hover { background: #6d28d9; transform: scale(1.02); }
+        input, select { background: #0f172a; border: 1px solid #334155; padding: 6px 10px; border-radius: 12px; color: white; }
+        label { font-weight: 500; }
+        .message { margin-top: 10px; padding: 8px; border-radius: 12px; }
+        .success { background: #166534; color: #bbf7d0; }
+        .error { background: #7f1a1a; color: #fecaca; }
     </style>
     <script>
         var roomId = "{{ room_id }}";
@@ -78,7 +85,7 @@
         <div id="reactionTriggers"></div>
         <h3>🐋 NHÀ ĐẦU TƯ ĐANG ỦNG HỘ</h3>
         <div id="investors" class="investors"></div>
-        <div id="message"></div>
+        <div id="message" class="message"></div>
     </div>
 
     <div id="endgamePanel" style="display:none;" class="panel endgame">
@@ -224,11 +231,12 @@
                     if (state.last_scenario) {
                         document.getElementById('scenarioDisplay').innerHTML = `📢 ${state.last_scenario}`;
                     }
-                    let metricsHtml = `<div>Intrinsic: ${state.metrics.intrinsic?.toFixed(1) || 0}</div>
-                                       <div>Valuation: ${state.metrics.valuation_sanity?.toFixed(1) || 0}</div>
-                                       <div>ROI: ${state.metrics.roi_norm?.toFixed(1) || 0}</div>
-                                       <div>Hype: ${state.hype} | Trans: ${state.transparency}</div>
-                                       <div>Runway: ${state.metrics.runway} tháng</div>`;
+                    let metricsHtml = `<div>📈 Intrinsic: ${state.metrics.intrinsic?.toFixed(1) || 0}</div>
+                                       <div>📉 Valuation: ${state.metrics.valuation_sanity?.toFixed(1) || 0}</div>
+                                       <div>💰 ROI: ${state.metrics.roi_norm?.toFixed(1) || 0}</div>
+                                       <div>🔥 Hype: ${state.hype} | 🔍 Trans: ${state.transparency}</div>
+                                       <div>🛫 Runway: ${state.metrics.runway} tháng</div>
+                                       <div>💧 Liquidity: ${state.metrics.liquidity?.toFixed(1) || 0}</div>`;
                     document.getElementById('metrics').innerHTML = metricsHtml;
                     let handHtml = '';
                     if (state.hand && state.hand.length) {
@@ -262,7 +270,7 @@
                     }
                     document.getElementById('investors').innerHTML = invHtml;
 
-                    // Hiển thị reaction triggers
+                    // Reaction triggers
                     if (state.triggers && state.triggers.length > 0) {
                         let triggersHtml = '<div class="reaction-trigger"><strong>⚡ REACTION CÓ THỂ KÍCH HOẠT:</strong><br>';
                         state.triggers.forEach((card, idx) => {
@@ -288,7 +296,7 @@
                                 const data = await res.json();
                                 if (data.ok) {
                                     alert('Đã sử dụng reaction!');
-                                    location.reload();  // reload để cập nhật hand và trigger mới
+                                    location.reload();
                                 } else {
                                     alert('Lỗi: ' + data.error);
                                 }
@@ -357,11 +365,11 @@
             });
             const data = await res.json();
             if (data.ok) {
-                document.getElementById('message').innerHTML = '<div style="color: #22c55e;">✅ Đã đánh thẻ!</div>';
+                document.getElementById('message').innerHTML = '<div class="success">✅ Đã đánh thẻ!</div>';
                 selectedCardIdx = null;
-                // Không reload ngay, chỉ chờ state update sau
+                setTimeout(() => document.getElementById('message').innerHTML = '', 2000);
             } else {
-                alert('Lỗi: ' + data.error);
+                document.getElementById('message').innerHTML = `<div class="error">❌ Lỗi: ${data.error}</div>`;
             }
         } catch (err) {
             alert('Lỗi: ' + err.message);
@@ -377,10 +385,10 @@
             });
             const data = await res.json();
             if (data.ok) {
-                document.getElementById('message').innerHTML = '<div>🃏 Đã Mulligan!</div>';
-                // Không reload, chờ polling cập nhật
+                document.getElementById('message').innerHTML = '<div class="success">🃏 Đã Mulligan!</div>';
+                setTimeout(() => document.getElementById('message').innerHTML = '', 2000);
             } else {
-                alert('Lỗi: ' + data.error);
+                document.getElementById('message').innerHTML = `<div class="error">❌ ${data.error}</div>`;
             }
         } catch (err) {
             alert('Lỗi: ' + err.message);
@@ -396,9 +404,9 @@
             });
             const data = await res.json();
             if (data.ok) {
-                document.getElementById('message').innerHTML = '<div>✅ Đã sẵn sàng, chờ host chạy phase.</div>';
+                document.getElementById('message').innerHTML = '<div class="success">✅ Đã sẵn sàng, chờ host chạy phase.</div>';
             } else {
-                alert('Lỗi: ' + data.error);
+                document.getElementById('message').innerHTML = `<div class="error">❌ ${data.error}</div>`;
             }
         } catch (err) {
             alert('Lỗi: ' + err.message);
