@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Host Startup Game</title>
+    <style>
+        * { box-sizing: border-box; font-family: system-ui; }
+        body { background: #0b1120; color: #eef2ff; padding: 20px; }
+        .container { max-width: 1200px; margin: auto; }
+        .panel { background: #1e293b; border-radius: 24px; padding: 20px; margin-bottom: 20px; }
+        button { background: #ec4899; border: none; padding: 10px 20px; border-radius: 30px; font-weight: bold; cursor: pointer; }
+        .flex { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+        .rankings { display: grid; gap: 10px; margin-top: 15px; }
+        .rank-card { background: #0f172a; border-radius: 16px; padding: 15px; border-left: 4px solid #ec4899; }
+        .rank-card h3 { margin: 0 0 8px 0; color: #fbcfe8; }
+        .logs { background: #00000066; border-radius: 16px; padding: 12px; max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 0.8rem; margin-top: 15px; }
+        .link-item { background: #0f172a; padding: 8px 12px; border-radius: 12px; margin-bottom: 8px; word-break: break-all; }
+        .link-item a { color: #ec4899; text-decoration: none; }
+        .link-item a:hover { text-decoration: underline; }
+        .status-ended { opacity: 0.6; border-left-color: #6b7280; }
+        .error-msg { color: #f87171; background: #7f1a1a; padding: 10px; border-radius: 12px; margin-top: 10px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div id="setupPanel" class="panel">
+        <h2>🎮 TẠO PHÒNG CHƠI</h2>
+        <label>Số người chơi (2-10):</label>
+        <input type="number" id="numPlayers" min="2" max="10" value="4">
+        <button id="createRoomBtn">Tạo phòng</button>
+        <div id="errorMsg" class="error-msg" style="display:none;"></div>
+    </div>
+
+    <div id="gamePanel" style="display:none;" class="panel">
+        <h2>🏠 PHÒNG: <span id="roomId"></span></h2>
+        <p><strong>🔗 Link mời người chơi (copy từng link gửi cho từng người):</strong></p>
+        <div id="joinLinksList" style="background: #0f172a; border-radius: 16px; padding: 12px; margin-bottom: 16px;">
+        </div>
+        <p>👥 Trạng thái: <span id="playerCount"></span> / <span id="maxPlayers"></span> đã tham gia</p>
+       
+        <h3>🏆 BẢNG XẾP HẠNG</h3>
+        <div id="rankings" class="rankings">Đang tải...</div>
+       
+        <div id="logsArea" class="logs"></div>
+        <div id="phaseControl">
+            <button id="runPhaseBtn" style="display:none;">▶ CHẠY PHASE TIẾP THEO</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let roomId = null;
+    let interval = null;
+
+    document.getElementById('createRoomBtn').onclick = async () => {
+        const num = parseInt(document.getElementById('numPlayers').value);
+        const errorDiv = document.getElementById('errorMsg');
+        errorDiv.style.display = 'none';
+        try {
+            const res = await fetch('/api/create_room', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({num_players: num})
+            });
+            if (!res.ok) {
+                const text = await res.text();
+                throw new Error(`Server error ${res.status}: ${text}`);
+            }
+            const data = await res.json();
+            if (!data.room_id) throw new Error('Không nhận được room_id');
+            roomId = data.room_id;
+           
+            let linksHtml = '';
+            data.join_links.forEach((link, idx) => {
+                linksHtml += `<div class="link-item">
+                                🎮 Người chơi ${idx+1}: <a href="${link}" target="_blank">${link}</a>
+                                <button class="copy-link-btn" data-link="${link}" style="margin-left: 10px; padding: 2px 8px; font-size: 0.7rem;">Sao chép</button>
+                              </div>`;
+            });
+            document.getElementById('joinLinksList').innerHTML = linksHtml;
+           
+            document.querySelectorAll('.copy-link-btn').forEach(btn => {
+                btn.onclick = () => {
+                    const link = btn.getAttribute('data-link');
+                    navigator.clipboard.writeText(link).then(() => alert('Đã sao chép link'));
+                };
+            });
+           
+            document.getElementById('roomId').innerText = roomId;
+            document.getElementById('maxPlayers').innerText = num;
+            document.getElementById('setupPanel').style.display = 'none';
+            document.getElementById('gamePanel').style.display = 'block';
+            startPolling();
+        } catch (err) {
+            errorDiv.style.display = 'block';
+            errorDiv.innerText = 'Lỗi: ' + err.message;
+            console.error(err);
+        }
+    };
+
+    async function startPolling() {
+        if (interval) clearInterval(interval);
+        interval = setInterval(async () => {
+            if (!roomId) return;
+            try {
+                let state = await fetch(`/api/host_state?room_id=${roomId}`).then(r=>r.json());
+                document.getElementById('playerCount').innerText = state.players_joined;
+                if (state.rankings) {
+                    let html = '';
+                    state.rankings.forEach(p => {
+                        const endedClass = p.status === 'ended' ? 'status-ended' : '';
+                        html += `<div class="rank-card ${endedClass}">
+                            <h3>${p.name}</h3>
+                            <div>💰 Funding: ${(p.funding * 100).toFixed(1)}%</div>
+                            <div>📊 Hype: ${p.hype} | Transparency: ${p.transparency}</div>
+                            <div>🏅 Điểm: ${p.score?.toFixed(2) || '0.00'}</div>
+                            <div>📏 Scale: ${p.scale || '?'}</div>
+                            ${p.status === 'ended' ? '<div>✅ Đã kết thúc</div>' : ''}
+                        </div>`;
+                    });
+                    document.getElementById('rankings').innerHTML = html;
+                }
+                if (state.logs) {
+                    document.getElementById('logsArea').innerHTML = state.logs.map(l=>`<div>${l}</div>`).join('');
+                }
+                if (state.status === 'playing') {
+                    if (state.all_ready) {
+                        document.getElementById('runPhaseBtn').style.display = 'inline-block';
+                    } else {
+                        document.getElementById('runPhaseBtn').style.display = 'none';
+                    }
+                    document.getElementById('runPhaseBtn').innerText = `▶ CHẠY PHASE ${state.phase}`;
+                } else {
+                    document.getElementById('runPhaseBtn').style.display = 'none';
+                }
+            } catch (err) {
+                console.error('Polling error:', err);
+            }
+        }, 2000);
+    }
+
+    document.getElementById('runPhaseBtn').onclick = async () => {
+        if (!roomId) return;
+        try {
+            let res = await fetch('/api/run_phase', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({room_id: roomId})
+            });
+            let data = await res.json();
+            if (data.ended) {
+                alert('🏆 GAME KẾT THÚC! 🏆');
+                clearInterval(interval);
+            } else {
+                document.getElementById('runPhaseBtn').style.display = 'none';
+            }
+        } catch (err) {
+            alert('Lỗi khi chạy phase: ' + err.message);
+        }
+    };
+</script>
+</body>
+</html>
